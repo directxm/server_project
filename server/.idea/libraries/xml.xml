@@ -1,10 +1,12 @@
 <component name="libraryTable">
   <library name="xml">
     <CLASSES>
-      <root url="file://$PROJECT_DIR$/lib/xml" />
+      <root url="jar://$PROJECT_DIR$/lib/xml/stax-1.2.0.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/xml/simple-xml-2.7.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/xml/stax-api-1.0.1.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/xml/xpp3-1.1.3_8.jar!/" />
     </CLASSES>
     <JAVADOC />
     <SOURCES />
-    <jarDirectory url="file://$PROJECT_DIR$/lib/xml" recursive="false" />
   </library>
 </component>

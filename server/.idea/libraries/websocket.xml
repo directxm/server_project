@@ -1,10 +1,10 @@
 <component name="libraryTable">
   <library name="websocket">
     <CLASSES>
-      <root url="file://$PROJECT_DIR$/lib/websocket" />
+      <root url="jar://$PROJECT_DIR$/lib/websocket/websocket-api.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/websocket/tomcat-websocket.jar!/" />
     </CLASSES>
     <JAVADOC />
     <SOURCES />
-    <jarDirectory url="file://$PROJECT_DIR$/lib/websocket" recursive="false" />
   </library>
 </component>
