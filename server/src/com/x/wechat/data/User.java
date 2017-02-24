@@ -153,6 +153,11 @@ public class User extends VersionSaveable//implements Value, Comparable<User>
 		return getOpenId();
 	}
 
+	public String getKey()
+	{
+		return getOpenId();
+	}
+
 	public String getOpenId()
 	{
 		return openId;

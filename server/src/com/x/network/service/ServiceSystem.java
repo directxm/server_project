@@ -197,7 +197,7 @@ public class ServiceSystem implements Comparable<ServiceSystem>
 		ServiceSelection serviceSelection = serviceSelections.get(name);
 		if(serviceSelection == null)
 		{
-			Logger.warn(ServiceSelection.class, "Not found service {}", name);
+			Logger.warn(this.getClass(), "Not found service {}", name);
 		}
 		return serviceSelection;
 	}
@@ -482,9 +482,9 @@ public class ServiceSystem implements Comparable<ServiceSystem>
 				if(c.checkFinishing())
 				{
 					iterator.remove();
-					//Logger.debug(ServiceCoroutine.class, "" + c.toString() + " stopped!");
+					Logger.debug(this.getClass(), "" + c.toString() + " stopped!");
 				}
-				//Logger.debug(ServiceCoroutine.class, "{} has {} messages.", c, c.messageBox.size());
+				Logger.debug(this.getClass(), "{} has {} messages.", c, c.messageBox.size());
 			}
 			finally
 			{
@@ -526,7 +526,7 @@ public class ServiceSystem implements Comparable<ServiceSystem>
 				{
 					wrapper = new ServiceWrapper(this, provider, pid, c);
 					ref = new ServiceWrapperWeakReference(wrapper, referenceQueue);
-					//Logger.debug(ServiceWrapper.class, "Create ServiceWrapper {}, {}", ref, key);
+					Logger.debug(this.getClass(), "Create ServiceWrapper {}, {}", ref, key);
 					serviceWrapperMap.put(key, ref);
 				}
 			}
@@ -551,19 +551,19 @@ public class ServiceSystem implements Comparable<ServiceSystem>
 						{
 							if(ref2 == ref)
 							{
-								//Logger.debug(ServiceWrapper.class, "Remove ServiceWrapper {}, {}", ref, ref.getKey());
+								Logger.debug(this.getClass(), "Remove ServiceWrapper {}, {}", ref, ref.getKey());
 								serviceWrapperMap.remove(ref.getKey());
 							}
 							else
 							{
-								//Logger.debug(ServiceWrapper.class, "New ServiceWrapper, 2 can't remove {}, {}, {}", ref2, ref, ref.getKey());
+								Logger.debug(this.getClass(), "New ServiceWrapper, 2 can't remove {}, {}, {}", ref2, ref, ref.getKey());
 							}
 						}
 					}
 				}
 				else
 				{
-					//Logger.debug(ServiceWrapper.class, "New ServiceWrapper, 1 can't remove {}, {}, {}", ref2, ref, ref.getKey());
+					Logger.debug(this.getClass(), "New ServiceWrapper, 1 can't remove {}, {}, {}", ref2, ref, ref.getKey());
 				}
 			}
 		}
