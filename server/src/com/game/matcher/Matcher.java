@@ -1,6 +1,6 @@
 package com.game.matcher;
 
-import com.game.Room;
+import com.game.room.Room;
 import com.x.network.io.Tickable;
 import com.x.wechat.data.User;
 
@@ -20,7 +20,8 @@ public abstract class Matcher implements Tickable
 	// id
 	protected Map<String, User> players = new HashMap<>();
 	// queued player
-	protected Map<String, User> queuedPlayers = new HashMap<>();
+	//protected Map<String, User> queuedPlayers = new HashMap<>();
+	protected List<String> queuedPlayers = new LinkedList<>();
 	protected Map<String, Room> playerInRooms = new HashMap<>();
 	// idle room
 	protected List<Room> recyclableRooms = new LinkedList<>();
@@ -29,46 +30,156 @@ public abstract class Matcher implements Tickable
 	protected List<Room> emergentRooms = new LinkedList<>();
 	// playing room
 	protected Map<Long, Room> fullRooms = new HashMap<>();
+	// previous room
+	protected Room previousRoom = null;
 
 	public void add(User player)
 	{
-		this.queuedPlayers.put(player.getKey(), player);
+		//this.queuedPlayers.put(player.getKey(), player);
+		this.queuedPlayers.add(player.getKey());
 		this.players.put(player.getKey(), player);
 	}
 
 	public void remove(User player)
 	{
-		if(this.queuedPlayers.containsKey(player.getKey()))
+		//if(this.queuedPlayers.containsKey(player.getKey()))
+		if(this.queuedPlayers.contains(player.getKey()))
 			this.queuedPlayers.remove(player.getKey());
 		else
 			leave(player);
 	}
 
-	protected void match(User player)
+	public void addTickable(Tickable t)
+	{
+
+	}
+
+	public Tickable removeTickable(Tickable t)
+	{
+		return null;
+	}
+
+	protected void match()
+	{
+		// 匹配房间
+		this.previousRoom = this.previousRoom == null ? matchRoom() : this.previousRoom;
+		if(this.previousRoom == null)
+		{
+			// error
+		}
+
+		while(!this.queuedPlayers.isEmpty())
+		{
+			// 玩家操作
+			String key = this.queuedPlayers.get(0);
+
+			if(key != null && this.players.containsKey(key))
+			{
+				User p = this.players.get(key);
+				// 终止匹配
+				if(p != null && onMatch(p, this.previousRoom))
+				{
+					this.queuedPlayers.remove(0);
+					break;
+				}
+			}
+			else
+			{
+				// mechanism of protection
+				this.queuedPlayers.remove(0);
+			}
+		}
+
+		if(this.previousRoom.canPlay())
+		{
+			addTickable(this.previousRoom);
+		}
+
+		if(this.previousRoom.isFull())
+		{
+			//this.emergentRooms.remove(this.previousRoom);
+			this.fullRooms.put(this.previousRoom.getUuid(), this.previousRoom);
+			this.previousRoom = null;
+		}
+	}
+
+	protected Room matchRoom()
 	{
 		Room room = null;
 		if(this.emergentRooms.size() <= 0)
 		{
 			if(!this.recyclableRooms.isEmpty())
+			{
 				room = this.recyclableRooms.get(0);
+				this.recyclableRooms.remove(0);
+			}
 			if(room == null)
 			{
 				room = allocate();
 				this.rooms.put(room.getUuid(), room);
-				this.recyclableRooms.add(room);
+				//this.emergentRooms.add(room);
 			}
+
+			//this.emergentRooms.add(room);
+			// ??? addTickable(room);
 		}
 		else
 		{
 			room = this.emergentRooms.get(0);
+			this.emergentRooms.remove(0);
 		}
 
-		onMatch(player, room);
+		return room;
+	}
+
+	/*protected void match(User player)
+	{
+		Room room = null;
+		if(this.emergentRooms.size() <= 0)
+		{
+			if(!this.recyclableRooms.isEmpty())
+			{
+				room = this.recyclableRooms.get(0);
+				this.recyclableRooms.remove(0);
+			}
+			if(room == null)
+			{
+				room = allocate();
+				this.rooms.put(room.getUuid(), room);
+				//this.emergentRooms.add(room);
+			}
+
+			//this.emergentRooms.add(room);
+			addTickable(room);
+		}
+		else
+		{
+			room = this.emergentRooms.get(0);
+			this.emergentRooms.remove(0);
+		}
+
+		//onMatch(player, room);
 
 		//if(room == null)
 		//	throw new Exception();
 		enter(player, room);
 
+	}*/
+
+	/**
+	 *
+	 * @param player
+	 * @param room
+	 * @return true:停止匹配 false:继续匹配下个人
+	 */
+	protected boolean onMatch(User player, Room room)
+	{
+		enter(player, room);
+
+		if(room.isFull())
+			return true;
+
+		return false;
 	}
 
 	protected boolean enter(User player, Room room)
@@ -76,7 +187,17 @@ public abstract class Matcher implements Tickable
 		if(room.enter(player))
 		{
 			this.playerInRooms.put(player.getKey(), room);
-			onEnter(player);
+			//onEnter(player); // 感觉这个多余了???
+
+			/*if(room.isFull())
+			{
+				this.fullRooms.put(room.getUuid(), room);
+			}
+			else
+			{
+				this.emergentRooms.add(room);
+			}*/
+
 			return true;
 		}
 
@@ -85,7 +206,7 @@ public abstract class Matcher implements Tickable
 
 	protected void leave(User player)
 	{
-		onLeave(player);
+		//onLeave(player);
 		if(this.playerInRooms.containsKey(player.getKey()))
 		{
 			Room room = this.playerInRooms.get(player.getKey());
@@ -97,6 +218,8 @@ public abstract class Matcher implements Tickable
 				if(room.isEmpty())
 				{
 					this.recyclableRooms.add(room);
+					removeTickable(room);
+					room.clear();
 				}
 				else
 				{
@@ -111,12 +234,18 @@ public abstract class Matcher implements Tickable
 	@Override
 	public void tick()
 	{
-		int hello = 1;
+		match();
+		/*if(!this.queuedPlayers.isEmpty())
+		{
+			String key = this.queuedPlayers.get(0);
+			this.queuedPlayers.remove(0);
+			if(key != null && this.players.containsKey(key))
+				match(this.players.get(key));
+		}*/
 	}
 
 	public abstract Room allocate();
 
-	public abstract void onMatch(User player, Room room);
 	public abstract void onEnter(User player);
 	public abstract void onLeave(User player);
 }

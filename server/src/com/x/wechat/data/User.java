@@ -2,6 +2,7 @@ package com.x.wechat.data;
 
 
 import com.x.database.cache.VersionSaveable;
+import com.x.util.TimeUtils;
 
 import java.sql.Timestamp;
 
@@ -106,6 +107,14 @@ public class User extends VersionSaveable//implements Value, Comparable<User>
 	{
 		User user = new User();
 
+
+		return user;
+	}
+
+	public static User test(String key)
+	{
+		User user = new User();
+		user.openId = key;
 
 		return user;
 	}

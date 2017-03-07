@@ -1,5 +1,8 @@
-package com.game;
+package com.game.room;
 
+import com.game.Constant;
+import com.x.lang.*;
+import com.x.lang.Random;
 import com.x.wechat.data.User;
 
 import java.io.Serializable;
@@ -11,6 +14,7 @@ import java.util.*;
 public class PokerBullRoom extends Room
 {
 	static int NEED_CARD_NUMBER = 5;
+	static int PREVIOUS_CARD_NUMBER = 5;
 	static int MIN_PLAYER_NUMBER = 2;
 	static int MAX_PLAYER_NUMBER = 6;
 
@@ -47,47 +51,159 @@ public class PokerBullRoom extends Room
 		}
 	}
 
-	public static class BullScore
+	public static class BullResult
 	{
-		public static BullScore Zero = new BullScore();
+		public static BullResult None = new BullResult();
 
 		public Constant.BullType type = Constant.BullType.BullNone;
 		public int score = 0;
 		public int major = 0;
 		public int minor = 0;
 
-		public BullScore()
+		public BullResult()
 		{
 		}
 
-		public BullScore(Constant.BullType type, int score)
+		public BullResult(Constant.BullType type, int score)
 		{
 			this.type = type;
 			this.score = score;
 		}
 
-		public BullScore(Constant.BullType type, int major, int minor)
+		public BullResult(Constant.BullType type, int major, int minor)
 		{
 			this.type = type;
 			this.major = major;
 			this.minor = minor;
 		}
 
+		public int compareTo(BullResult other)
+		{
+			if(this.type == other.type)
+				return this.major - other.major;
+
+			return this.type.getKey() - other.type.getKey();
+		}
 
 		//public int a;
 	}
 
+	public static class Judgement
+	{
+		List<Integer> decad = new ArrayList<>();
+		List<Integer> bull = new ArrayList<>();
+
+		//Constant.BullType type = Constant.BullType.BullNone;
+		//int score = 0;
+		//int major = 0;
+		//int minor = 0;
+
+		public static Judgement create(List<Integer> decad, List<Integer> bull)
+		{
+			if(decad.size() != 3)
+				return null;
+
+			if(bull.size() != 2)
+				return null;
+
+			int total = 0;
+			for(Integer i : decad)
+			{
+				if(bull.contains(i))
+					return null;
+
+				total += Constant.PokerCardType.parseDecade(i);
+			}
+
+			if(total % 10 != 0)
+				return null;
+
+			Judgement j = new Judgement();
+			j.decad = decad;
+			j.bull = bull;
+
+			return j;
+		}
+
+		private Judgement()
+		{
+		}
+		//BullScore score = new BullScore();
+
+		public boolean equals(List<Integer> values)
+		{
+			if((this.decad.size() + this.bull.size()) != values.size())
+				return false;
+
+			for(Integer i : this.decad)
+			{
+				if(!values.contains(i))
+					return false;
+			}
+
+			for(Integer i : this.bull)
+			{
+				if(!values.contains(i))
+					return false;
+			}
+
+			return true;
+		}
+	}
+
 	protected String banker = null;
+	protected Map<Integer, List<String>> callingOdds = new HashMap<>();
 	protected long remainingValue;
 	protected Map<String, Long> bettingValue = new HashMap<>();
-	protected Map<String, Integer> odds = new HashMap<>();
+	protected Map<String, Integer> bettingOdds = new HashMap<>();
 	protected Map<String, Integer> priorityValue = new HashMap<>();
 	protected Map<String, List<Integer>> currentCards = new HashMap<>();
+	protected Map<String, Judgement> previousJudgements = new HashMap<>();
 
+	/// cards
 	protected List<Integer> remaining = new LinkedList<>();
 	protected List<Integer> used = new ArrayList<>();
 
 	protected boolean isPlay = false;
+
+	// 处在某个状态下有些消息/操作需要忽略
+
+	enum State implements Room.State
+	{
+		WAIT(0, 10),
+		//SHUFFLE(0, 10),
+		DEAL(1, 10),
+		CALL(2, 10),
+		RANDOM_CALL(3, 10),
+		BET(4, 10),
+		FINAL_DEAL(5, 10),
+		PRIZE(6, 10),
+		OVER(7, 10),
+		;
+
+		private int key;
+		@Override
+		public int getKey()
+		{
+			return key;
+		}
+		private int cooldown;
+		public int getCooldown()
+		{
+			return cooldown;
+		}
+
+		State(int key, int cooldown)
+		{
+			this.key = key;
+			this.cooldown = cooldown;
+		}
+	}
+
+	public PokerBullRoom()
+	{
+		super(111111L, null);
+	}
 
 	public void shuffle()
 	{
@@ -98,33 +214,196 @@ public class PokerBullRoom extends Room
 
 	public void dealOrderly()
 	{
-		for(int i = 0; i < NEED_CARD_NUMBER; ++i)
+		for(int i = 0; i < PREVIOUS_CARD_NUMBER; ++i)
 		{
-			for(String id : players.keySet())
+			for(String id : this.players.keySet())
 			{
 				if(!this.currentCards.containsKey(id))
 					this.currentCards.put(id, new ArrayList<>());
 
-				List<Integer> list = currentCards.get(id);
+				List<Integer> list = this.currentCards.get(id);
 				Integer obj = this.remaining.get(0);
 				this.remaining.remove(obj);
 				list.add(obj);
 				this.used.add(obj);
 			}
 		}
+		// default odds values
+		for(User o : this.players.values())
+		{
+			setBettingOdds(o, this.regulation.defaultBettingOdds());
+			//setCallingOdds(o, this.regulation.defaultCallingOdds());
+		}
 	}
 
-	public void deal()
+	/*public void deal()
 	{
 
+	}*/
+
+	public void dealFinally()
+	{
+		for(String id : players.keySet())
+		{
+			if(!this.currentCards.containsKey(id))
+				this.currentCards.put(id, new ArrayList<>());
+
+			List<Integer> list = currentCards.get(id);
+			Integer obj = this.remaining.get(0);
+			this.remaining.remove(obj);
+			list.add(obj);
+			this.used.add(obj);
+		}
+	}
+
+	public void call()
+	{
+		int previous = -1;
+		List<String> list = null;
+		for(Map.Entry<Integer, List<String>> entry : this.callingOdds.entrySet())
+		{
+			if(previous < entry.getKey())
+			{
+				previous = entry.getKey();
+				list = entry.getValue();
+			}
+		}
+
+		if(list == null || list.isEmpty())
+		{
+			list = new ArrayList<>();
+			list.addAll(this.players.keySet());
+		}
+
+		String key = list.get(Random.randomInt(100) % list.size());
+		if(key == null)
+		{
+			/// error
+		}
+
+		User player = this.players.get(key);
+		if(player == null)
+		{
+			/// error
+		}
+
+		this.banker = key;
+	}
+
+	/*public void callRandomly(List<User> players)
+	{
+		User player = players.get(com.x.lang.Random.randomInt(100) % players.size());
+		if(player == null)
+		{
+			// error
+		}
+
+		this.banker = player.getKey();
+	}*/
+
+	public void bet(User player, int odds)
+	{
+		this.bettingOdds.put(player.getKey(), odds);
+	}
+
+	public void prize()
+	{
+		BullResult result = BullResult.None;
+		Judgement judgement = this.previousJudgements.get(this.banker);
+		if(judgement != null)
+		{
+			result = judgeResult(judgement);
+		}
+		else
+		{
+			List<Integer> list = this.currentCards.get(this.banker);
+			result = judgeResult(list);
+		}
+
+		// settlement
+		for(Map.Entry<String, List<Integer>> entry : this.currentCards.entrySet())
+		{
+			if(entry.getKey() != this.banker)
+			{
+				BullResult r = BullResult.None;
+				Judgement j = this.previousJudgements.get(this.banker);
+				if(j != null)
+				{
+					r = judgeResult(j);
+				}
+				else
+				{
+					List<Integer> list = this.currentCards.get(this.banker);
+					r = judgeResult(list);
+				}
+
+				int o = this.bettingOdds.get(entry.getKey());
+				int c = result.compareTo(r);
+
+				if(c > 0) // banker win
+				{
+					int v = regulation.prize(true, o, r.type.getKey());
+				}
+				else // banker lose
+				{
+					int v = regulation.prize(true, o, r.type.getKey());
+				}
+
+			}
+		}
+	}
+
+	public void over()
+	{
+		this.banker = null;
+		this.currentCards.clear();
+		this.previousJudgements.clear();
+
+		shuffle();
+	}
+
+	public BullResult judgeResult(Judgement judgement)
+	{
+		int major = Constant.PokerCardType.CardInvalid.getKey();
+		int minor = Constant.PokerCardType.CardInvalid.getKey();
+		int score = -1;
+		for(int i : judgement.decad)
+		{
+			minor = major == Constant.PokerCardType.CardInvalid.getKey() ? Constant.PokerCardType.CardInvalid.getKey() : Math.min(major, Math.max(minor, i));
+			major = Math.max(major, i);
+		}
+		for(int i : judgement.bull)
+		{
+			minor = major == Constant.PokerCardType.CardInvalid.getKey() ? Constant.PokerCardType.CardInvalid.getKey() : Math.min(major, Math.max(minor, i));
+			major = Math.max(major, i);
+			score += Constant.PokerCardType.parseDecade(i);
+		}
+
+		BullResult result = BullResult.None;
+		result.major = major;
+		result.minor = minor;
+		result.score = score;
+
+		if(isBoomBull(judgement))
+		{
+			result.type = Constant.BullType.BoomBull;
+		}
+		else if(isSuitBull(null, result))
+		{
+			result.type = Constant.BullType.SuitBull;
+		}
+
+		result.type = Constant.BullType.parse(score);
+
+		return result;
 	}
 
 	/*
 	 *
 	 */
-	public BullScore judgeResult(List<Integer> five)
+	public BullResult judgeResult(List<Integer> five)
 	{
-		BullScore result = BullScore.Zero;
+		BullResult result = BullResult.None;
 
 		if(five != null && five.size() == NEED_CARD_NUMBER)
 		{
@@ -134,7 +413,7 @@ public class PokerBullRoom extends Room
 	        Map<Integer, List<Integer>> map = new HashMap<>();
 		    for(int i : five)
 		    {
-			    int decade = Constant.PokerCardType.parseDecade(i) % 10;
+			    int decade = Constant.PokerCardType.parseDecade(i) % 10; // 这里为了把10变成0
 		        sum += decade;
 			    //int count = 0;
 			    if(!map.containsKey(decade))
@@ -209,7 +488,12 @@ public class PokerBullRoom extends Room
 		return result;
 	}
 
-	public boolean isBoomBull(Map<Integer, List<Integer>> map, BullScore result)
+	public boolean isBoomBull(Judgement judgement)
+	{
+		return false;
+	}
+
+	public boolean isBoomBull(Map<Integer, List<Integer>> map, BullResult result)
 	{
 		if(map != null && !map.isEmpty() && result != null)
 		{
@@ -237,7 +521,12 @@ public class PokerBullRoom extends Room
 		return false;
 	}
 
-	public boolean isSuitBull(Map<Integer, List<Integer>> map, BullScore result)
+	public boolean isSuitBull(Judgement judgement)
+	{
+		return false;
+	}
+
+	public boolean isSuitBull(Map<Integer, List<Integer>> map, BullResult result)
 	{
 		if(map != null && map.containsKey(0) && result != null)
 		{
@@ -285,6 +574,42 @@ public class PokerBullRoom extends Room
 	@Override
 	public void tick()
 	{
+		this.countingDelta++;
+		// 这里有些繁琐，改成状态机很好
+		if(this.state == State.WAIT && this.countingDelta >= State.WAIT.getCooldown())
+		{
+			this.countingDelta = 0;
+			this.state = State.DEAL;
+			dealOrderly();
+		}
+		else if(this.state == State.DEAL && this.countingDelta >= State.DEAL.getCooldown())
+		{
+			this.countingDelta = 0;
+		}
+		else if(this.state == State.CALL && this.countingDelta >= State.CALL.getCooldown())
+		{
+			this.countingDelta = 0;
+		}
+		else if(this.state == State.RANDOM_CALL && this.countingDelta >= State.RANDOM_CALL.getCooldown())
+		{
+			this.countingDelta = 0;
+		}
+		else if(this.state == State.BET && this.countingDelta >= State.BET.getCooldown())
+		{
+			this.countingDelta = 0;
+		}
+		else if(this.state == State.FINAL_DEAL && this.countingDelta >= State.FINAL_DEAL.getCooldown())
+		{
+			this.countingDelta = 0;
+		}
+		else if(this.state == State.PRIZE && this.countingDelta >= State.PRIZE.getCooldown())
+		{
+			this.countingDelta = 0;
+		}
+		else if(this.state == State.OVER && this.countingDelta >= State.OVER.getCooldown())
+		{
+			this.countingDelta = 0;
+		}
 
 	}
 
@@ -295,9 +620,15 @@ public class PokerBullRoom extends Room
 	}
 
 	@Override
+	public boolean canPlay()
+	{
+		return getPlayingNumber() > 2;
+	}
+
+	@Override
 	public void clear()
 	{
-
+		super.clear();
 	}
 
 	@Override
@@ -316,6 +647,17 @@ public class PokerBullRoom extends Room
 	{
 		return isPlay;
 	}
+
+	// 开始游戏每人设置一遍
+	public void setBettingOdds(User player, int odds)
+	{
+		this.bettingOdds.put(player.getKey(), odds);
+	}
+
+	/*public void setCallingOdds(User player, int odds)
+	{
+		this.callingOdds.put(player.getKey(), odds);
+	}*/
 
 	public static int next(int x)
 	{

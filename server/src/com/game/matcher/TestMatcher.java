@@ -1,15 +1,11 @@
 package com.game.matcher;
 
 
-import com.game.Room;
+import com.game.room.*;
 import com.x.network.ServiceThreadPool;
-import com.x.network.io.Tickable;
 import com.x.network.service.ServiceSystem;
 import com.x.util.SystemUtils;
 import com.x.wechat.data.User;
-
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Created by fatum on 2017/2/18.
@@ -57,24 +53,12 @@ public class TestMatcher extends Matcher
 	}
 
 	@Override
-	public void tick()
-	{
-		int hello = 1;
-	}
-
-	@Override
 	public Room allocate()
 	{
-		return null;
+		return new PokerBullRoom();
 	}
 
-	@Override
-	public void onMatch(User player, Room room)
-	{
-
-	}
-
-	public static void addTickable(Tickable t)
+	/*public static void addTickable(Tickable t)
 	{
 
 	}
@@ -89,7 +73,7 @@ public class TestMatcher extends Matcher
 	public static void executeRunnable(final Runnable runnable)
 	{
 		//executorService.execute(runnable);
-	}
+	}*/
 
 	public static void main(String[] args)
 	{
@@ -102,10 +86,18 @@ public class TestMatcher extends Matcher
 
 			test.start();
 
+			matcher.add(User.test("test1"));
+			matcher.add(User.test("test2"));
+			matcher.add(User.test("test3"));
+
 			for(int i = 0; i < 10; ++i)
 			{
 
 			}
+
+			//Thread.sleep(Long.MAX_VALUE);
+
+			System.out.println("test over");
 
 		}
 		catch(Exception e)
