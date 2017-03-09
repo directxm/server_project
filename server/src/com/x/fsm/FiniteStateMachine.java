@@ -26,69 +26,106 @@ public abstract class FiniteStateMachine<T>
             this.timer = new Counter(Float.POSITIVE_INFINITY);
         }
 
-        public void resetTimer()
+        public State(T content, float total)
+        {
+            if (content == null)
+            {
+                Logger.error("State with content == null");
+            }
+            this.content = content;
+            this.timer = new Counter(total);
+        }
+
+        public final void resetTimer()
         {
             this.timer.reset();
         }
 
-        public void redefineTimer(float total)
+        public final void redefineTimer(float total)
         {
             this.timer.redefine(total);
         }
 
-        public void neverTimeOut()
+        public final void neverTimeOut()
         {
             this.timer.infinity();
         }
 
-        public boolean isNeverTimeOut()
+        public final boolean isNeverTimeOut()
         {
             return this.timer.isInfinite();
         }
 
-        public void timeOut()
+        public final void timeOut()
         {
             this.timer.exceed();
         }
 
-        public boolean isTimeOut()
+        public final boolean isTimeOut()
         {
             return this.timer.isExceed();
         }
 
-        public void reset()
+        public final void reset()
         {
+            System.out.println(this.getClass().toString() + "::" + getMethodName() + " timer =" + this.timer);
+
             onReset();
             resetTimer();
         }
 
-        public State input(Event e)
+        public final State input(Event e)
         {
+            System.out.println(this.getClass().toString() + "::" + getMethodName() + " timer =" + this.timer);
+
             return doEvent(e);
         }
 
-        public State tick(float deltaTime)
+        public final State tick(float delta)
         {
-            this.timer.increase(deltaTime);
-            return doTick(deltaTime);
+            System.out.println(this.getClass().toString() + "::" + getMethodName() + " timer =" + this.timer);
+
+            this.timer.increase(delta);
+            return doTick(delta);
         }
 
-        public void enter(Event e, State lastState)
+        public final void enter(Event e, State lastState)
         {
+            System.out.println(this.getClass().toString() + "::" + getMethodName() + " timer =" + this.timer);
+
             reset();
             onEnter(e, lastState);
         }
 
-        public void exit(Event e, State nextState)
+        public final void exit(Event e, State nextState)
         {
+            System.out.println(this.getClass().toString() + "::" + getMethodName() + " timer =" + this.timer);
+
             onExit(e, nextState);
         }
 
+        public final void handle(Object object)
+        {
+            System.out.println(this.getClass().toString() + "::" + getMethodName() + " timer =" + this.timer);
+
+            onHandle(object);
+        }
+
+        protected void onHandle(Object object) {}
         protected void onReset() {}
         protected void onEnter(Event e, State lastState) {}
         protected void onExit(Event e, State nextState) {}
         protected State doEvent(Event e) { return this; }
         protected State doTick(float deltaTime) { return this; }
+
+        // µ˜ ‘”√
+        private String getMethodName()
+        {
+            StackTraceElement[] stacktrace = Thread.currentThread().getStackTrace();
+            StackTraceElement e = stacktrace[2];
+            String methodName = e.getMethodName();
+            return methodName;
+        }
     }
 
     public static class Event
@@ -167,19 +204,19 @@ public abstract class FiniteStateMachine<T>
         return false;
     }
 
-    public boolean tick(float deltaTime)
+    public boolean tick(float delta)
     {
         if (this.currentState != null)
         {
             State caller = this.currentState;
-            State nextState = caller.tick(deltaTime);
+            State nextState = caller.tick(delta);
             if (caller != this.currentState)
             {
                 return false;
             }
             if (nextState != this.currentState)
             {
-                TickEvent e = new TickEvent(deltaTime);
+                TickEvent e = new TickEvent(delta);
                 return changeCurrentState(nextState, e);
             }
         }

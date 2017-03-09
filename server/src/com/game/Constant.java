@@ -48,6 +48,39 @@ public interface Constant
 		{
 			return this.key;
 		}
+
+		@Override
+		public String toString()
+		{
+			if(key == BullNone.getKey())
+				return "没牛";
+			else if(key == BullOne.getKey())
+				return "牛一";
+			else if(key == BullTwo.getKey())
+				return "牛二";
+			else if(key == BullThree.getKey())
+				return "牛三";
+			else if(key == BullFour.getKey())
+				return "牛四";
+			else if(key == BullFive.getKey())
+				return "牛五";
+			else if(key == BullSix.getKey())
+				return "牛六";
+			else if(key == BullSeven.getKey())
+				return "牛七";
+			else if(key == BullEight.getKey())
+				return "牛八";
+			else if(key == BullNine.getKey())
+				return "牛九";
+			else if(key == DoubleBull.getKey())
+				return "牛牛";
+			else if(key == BoomBull.getKey())
+				return "炸弹牛";
+			else if(key == SuitBull.getKey())
+				return "五花牛";
+
+			return "未知";
+		}
 	}
 
 	// 花色大小依次为黑桃、红桃、梅花、方片
@@ -87,13 +120,13 @@ public interface Constant
 		public String toString()
 		{
 			if(key == Spade.getKey())
-				return "黑 ";
+				return "黑";
 			else if(key == Heart.getKey())
-				return "红 ";
+				return "红";
 			else if(key == Club.getKey())
-				return "花 ";
+				return "花";
 			else if(key == Diamond.getKey())
-				return "片 ";
+				return "片";
 
 			return "未知";
 		}
@@ -134,30 +167,37 @@ public interface Constant
 			this.key = key;
 		}
 
-		// 带花色的牌转换成数值
+		// 带花色的牌转换成自然数
 		public static int parseInteger(int card)
 		{
 			return (card >> 10);
 		}
 
-		// 带花色的牌转换成数值
+		// 带花色的牌转换成十进制数值
 		public static int parseDecade(int card)
 		{
 			int value = parseInteger(card);
 			return value > 10 ? 10 : value;
 		}
 
-		// 转换花色
+		// 带花色的牌转换成牌型
+		public static int parseType(int card)
+		{
+			return (parseInteger(card) << 10);
+		}
+
+		// 带花色的牌转换成花色
 		public static int parseSuit(int card)
 		{
 			return (card & PokerCardSuit.ALL.getKey());
 		}
 
 		// 值和花合成一张牌
-		public static int toPokerCard(int value, int suit)
+		// 废除，这个value不明了
+		/*public static int toPokerCard(int value, int suit)
 		{
 			return (1 << (10 + value) | suit);
-		}
+		}*/
 
 		// 类型和花合成一张牌
 		public static int toPokerCard(PokerCardType type, PokerCardSuit suit)
@@ -175,7 +215,19 @@ public interface Constant
 		public String toString()
 		{
 			return " " +
-					parseInteger(key) + " ";
+					parseType(key) + " ";
 		}
+	}
+
+	public static void main(String[] args)
+	{
+		int card = PokerCardType.toPokerCard(PokerCardType.CardK, PokerCardSuit.Spade);
+		int type = PokerCardType.parseType(card);
+		PokerCardType ct = PokerCardType.parse(type);
+		int suit = PokerCardType.parseSuit(card);
+		PokerCardSuit cs = PokerCardSuit.parse(suit);
+		int i = PokerCardType.parseInteger(card);
+		int d = PokerCardType.parseDecade(card);
+
 	}
 }

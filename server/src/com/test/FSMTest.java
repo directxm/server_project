@@ -69,7 +69,7 @@ public class FSMTest extends FiniteStateMachine<FSMTest.FSMContent>
 
 		public StateOne(FSMContent content)
 		{
-			super(content);
+			super(content, 3000L);
 		}
 
 		@Override
@@ -95,6 +95,11 @@ public class FSMTest extends FiniteStateMachine<FSMTest.FSMContent>
 		protected State doTick(float deltaTime)
 		{
 			System.out.println(this.getClass().toString() + "::doTick timer =" + this.timer);
+
+			if(isTimeOut())
+			{
+				return new StateDefault(content);
+			}
 			return this;
 		}
 	}

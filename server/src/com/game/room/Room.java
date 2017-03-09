@@ -1,7 +1,9 @@
 package com.game.room;
 
 import com.game.regulation.Regulation;
+import com.x.fsm.FiniteStateMachine;
 import com.x.network.io.Tickable;
+import com.x.network.io.Ticker;
 import com.x.wechat.data.User;
 
 import java.util.HashMap;
@@ -12,62 +14,117 @@ import java.util.Map;
  */
 public abstract class Room implements Tickable
 {
-	public interface State
+
+	/*public static class RoomFiniteStateMachine<T extends Room> extends FiniteStateMachine<T>
 	{
-		int getKey();
+		public RoomFiniteStateMachine(T content)
+		{
+			super(content);
+		}
+
+		@Override
+		public State<T> createEnterState()
+		{
+			return new NullState(content);
+		}
+	}*/
+
+	public static class State<T extends Room> extends FiniteStateMachine.State<T>
+	{
+		public State(T content)
+		{
+			super(content);
+		}
+
+		public State(T content, float total)
+		{
+			super(content, total);
+		}
+
+		// 在这种状态下的处理
+
+		//int getKey();
 
 		// 是否可进入
 		// 进入时触发
 		// 结束时触发
 	}
 
-	protected final long uuid;
-	protected final Regulation regulation;
+	/*public static class NullState extends State
+	{
+		public NullState(Room content)
+		{
+			super(content);
+		}
+	}*/
 
-	protected Map<String, User> players = new HashMap<>();
+	protected final long uuid;
+	protected final Ticker ticker;
+	protected final Regulation regulation;
+	//protected final FiniteStateMachine fsm;// = new RoomFiniteStateMachine(this);
+
+	protected Map<String, User> playingPlayers = new HashMap<>();
 	protected Map<String, User> waitingPlayers = new HashMap<>();
 
+	protected boolean tick = false;
 	protected boolean play = false;
 	protected long countingDelta = 0L;
 	protected State state;
 
-	public Room(long uuid, Regulation regulation)
+	public Room(long uuid, Ticker ticker, Regulation regulation/*, FiniteStateMachine fsm*/)
 	{
 		this.uuid = uuid;
+		this.ticker = ticker;
 		this.regulation = regulation;
+		//this.fsm = fsm;
 	}
 
-	public long getUuid()
+	public final long getUuid()
 	{
 		return uuid;
 	}
 
-	public boolean isFull()
+	public final boolean isFull()
 	{
 		return getParticipatingNumber() >= getMaxNumber();
 	}
 
-	public boolean isEmpty()
+	public final boolean isEmpty()
 	{
 		return (getParticipatingNumber()) <= 0;
 	}
 
-	public int getPlayingNumber()
+	public final int getPlayingNumber()
 	{
-		return players.size();
+		return playingPlayers.size();
 	}
 
-	public int getWaitingNumber()
+	public final int getWaitingNumber()
 	{
 		return waitingPlayers.size();
 	}
 
-	public int getParticipatingNumber()
+	public final int getParticipatingNumber()
 	{
 		return getPlayingNumber() + getWaitingNumber();
 	}
 
-	public boolean enter(User player)
+	public final boolean isPlay()
+	{
+		return play;
+	}
+
+	public final void play(boolean play)
+	{
+		this.play = play;
+	}
+
+	public final boolean isTick()
+	{
+		return this.tick;
+	}
+
+	public final boolean enter(User player)
 	{
 		if(isFull())
 			return false;
@@ -77,20 +134,45 @@ public abstract class Room implements Tickable
 		return true;
 	}
 
-	public void leave(User player)
+	public final void leave(User player)
 	{
 		if(this.waitingPlayers.containsKey(player.getKey()))
 			this.waitingPlayers.remove(player.getKey());
 
-		if(this.players.containsKey(player.getKey()))
+		if(this.playingPlayers.containsKey(player.getKey()))
 		{
 			if(isPlay())
 			{
 				over(player);
 					//regulation.leave(player, this);
 			}
-			this.players.remove(player.getKey());
+			this.playingPlayers.remove(player.getKey());
 		}
+	}
+
+	// removeTickable 之后执行
+	public void stop()
+	{
+		this.playingPlayers.clear();
+		this.waitingPlayers.clear();
+
+		this.play = false;
+		this.countingDelta = 0L;
+
+		this.tick = false;
+		ticker.removeTickable(this);
+
+		System.out.println("room id =" + uuid + " stop!");
+	}
+
+	// addTickable 之后执行
+	public void start()
+	{
+		//this.play = true;
+		this.tick = true;
+		ticker.addTickable(this);
+
+		System.out.println("room id =" + uuid + " start!");
 	}
 
 	public void start(User player)
@@ -99,6 +181,11 @@ public abstract class Room implements Tickable
 	}
 
 	public void over(User player)
+	{
+
+	}
+
+	public void boardcast(Object object)
 	{
 
 	}
@@ -122,20 +209,31 @@ public abstract class Room implements Tickable
 
 	public abstract boolean canPlay();
 
-	public boolean isPlay()
-	{
-		return play;
-	}
-
-	public void clear()
-	{
-		this.players.clear();
-		this.waitingPlayers.clear();
-
-		this.play = false;
-		this.countingDelta = 0L;
-
-	}
 	public abstract void onEnter(User player);
 	public abstract void onLeave(User player);
+	public abstract void onTick(float delta);
+
+	@Override
+	public long elapse()
+	{
+		// 一秒一回
+		return 1000L;
+	}
+
+	@Override
+	public void tick()
+	{
+		float delta = 1000L;
+		//fsm.tick(delta);
+		onTick(delta);
+	}
+
+	// 调试用
+    protected String getMethodName()
+    {
+        StackTraceElement[] stacktrace = Thread.currentThread().getStackTrace();
+        StackTraceElement e = stacktrace[2];
+        String methodName = e.getMethodName();
+        return methodName;
+    }
 }

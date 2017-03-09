@@ -1,8 +1,11 @@
 package com.game.room;
 
 import com.game.Constant;
+import com.game.regulation.Regulation;
+import com.x.fsm.FiniteStateMachine;
 import com.x.lang.*;
 import com.x.lang.Random;
+import com.x.network.io.Ticker;
 import com.x.wechat.data.User;
 
 import java.io.Serializable;
@@ -14,11 +17,30 @@ import java.util.*;
 public class PokerBullRoom extends Room
 {
 	static int NEED_CARD_NUMBER = 5;
-	static int PREVIOUS_CARD_NUMBER = 5;
+	static int PREVIOUS_CARD_NUMBER = 4;
 	static int MIN_PLAYER_NUMBER = 2;
 	static int MAX_PLAYER_NUMBER = 6;
 
-	static class Pair implements Serializable
+	static long WAIT_TIME_MILLISECOND = 5 * 1000L;
+	static long WAIT_CALL_TIME_MILLISECOND = 5 * 1000L;
+	static long WAIT_BET_TIME_MILLISECOND = 5 * 1000L;
+	static long WAIT_SETTLE_TIME_MILLISECOND = 10 * 1000L;
+
+	/*public static class RoomFiniteStateMachine extends FiniteStateMachine<Room>
+	{
+		public RoomFiniteStateMachine(Room content)
+		{
+			super(content);
+		}
+
+		@Override
+		public State<? extends Room> createEnterState()
+		{
+			return new WaitState(content, Float.POSITIVE_INFINITY);
+		}
+	}*/
+
+	/*static class Pair implements Serializable
 	{
 		public int count;
 		public int value;
@@ -49,7 +71,7 @@ public class PokerBullRoom extends Room
 			result = 31 * result + value;
 			return result;
 		}
-	}
+	}*/
 
 	public static class BullResult
 	{
@@ -83,6 +105,17 @@ public class PokerBullRoom extends Room
 				return this.major - other.major;
 
 			return this.type.getKey() - other.type.getKey();
+		}
+
+		@Override
+		public String toString()
+		{
+			return " 结果{" +
+					"type=" + type +
+					", score=" + score +
+					", major=" + major +
+					", minor=" + minor +
+					'}';
 		}
 
 		//public int a;
@@ -165,10 +198,230 @@ public class PokerBullRoom extends Room
 	protected List<Integer> used = new ArrayList<>();
 
 	protected boolean isPlay = false;
+	protected final RoomFiniteStateMachine fsm = new RoomFiniteStateMachine(this);
 
 	// 处在某个状态下有些消息/操作需要忽略
+	public static class RoomFiniteStateMachine extends FiniteStateMachine<PokerBullRoom>
+	{
+		public RoomFiniteStateMachine(PokerBullRoom content)
+		{
+			super(content);
+		}
 
-	enum State implements Room.State
+		@Override
+		public State<? extends PokerBullRoom> createEnterState()
+		{
+			return new WaitState(this.content);
+		}
+
+		public void handle(Object object)
+		{
+			if(this.currentState != null)
+				this.currentState.handle(object);
+		}
+	}
+
+	//protected final static int WAIT = 0;
+	//protected final static int DEAL = 1;
+	//protected final static int CALL = 2;
+	//protected final static int RANDOM_CALL(3, 10),
+	//protected final static int BET = 4;
+	//protected final static int FINAL_DEAL = 5;
+	//protected final static int PRIZE = 6;
+
+	public static class WaitState extends Room.State<PokerBullRoom>
+	{
+		public WaitState(PokerBullRoom content)
+		{
+			super(content, WAIT_TIME_MILLISECOND);
+		}
+
+		@Override
+		protected void onEnter(FiniteStateMachine.Event e, FiniteStateMachine.State lastState)
+		{
+			// 进入等待状态
+			this.content.over();
+		}
+
+		@Override
+		protected void onExit(FiniteStateMachine.Event e, FiniteStateMachine.State nextState)
+		{
+			// 退出等待状态
+			this.content.play(true);
+			//this.content.dealOrderly();
+		}
+
+		@Override
+		protected FiniteStateMachine.State doTick(float deltaTime)
+		{
+			// 这里要一直检测防人退出不全了
+			if(isTimeOut()/* && this.content.isPlay()*/)
+			{
+				return new WaitCallState(content);
+			}
+			return this;
+		}
+	}
+
+	/*public static class DealState extends Room.State<PokerBullRoom>
+	{
+
+		public DealState(PokerBullRoom content)
+		{
+			super(content, 1000L);
+		}
+
+		@Override
+		protected void onEnter(FiniteStateMachine.Event e, FiniteStateMachine.State lastState)
+		{
+			super.onEnter(e, lastState);
+		}
+
+		@Override
+		protected FiniteStateMachine.State doTick(float deltaTime)
+		{
+			return super.doTick(deltaTime);
+		}
+	}*/
+
+	public static class WaitCallState extends Room.State<PokerBullRoom>
+	{
+
+		public WaitCallState(PokerBullRoom content)
+		{
+			super(content, WAIT_CALL_TIME_MILLISECOND);
+		}
+
+		@Override
+		protected void onEnter(FiniteStateMachine.Event e, FiniteStateMachine.State lastState)
+		{
+			// 进入叫庄状态
+			// 发牌
+			this.content.dealOrderly();
+		}
+
+		@Override
+		protected void onExit(FiniteStateMachine.Event e, FiniteStateMachine.State nextState)
+		{
+			// 退出叫庄状态
+			// 决定庄
+			this.content.call();
+		}
+
+		@Override
+		protected FiniteStateMachine.State doTick(float deltaTime)
+		{
+			if(isTimeOut())
+			{
+				return new WaitBetState(this.content);
+			}
+			return this;
+		}
+	}
+
+	public static class WaitBetState extends Room.State<PokerBullRoom>
+	{
+		public WaitBetState(PokerBullRoom content)
+		{
+			super(content, WAIT_BET_TIME_MILLISECOND);
+		}
+
+		@Override
+		protected void onEnter(FiniteStateMachine.Event e, FiniteStateMachine.State lastState)
+		{
+			super.onEnter(e, lastState);
+		}
+
+		@Override
+		protected void onExit(FiniteStateMachine.Event e, FiniteStateMachine.State nextState)
+		{
+			// 退出下注状态
+			// 决定下注倍数
+			super.onExit(e, nextState);
+		}
+
+		@Override
+		protected FiniteStateMachine.State doTick(float deltaTime)
+		{
+			if(isTimeOut())
+			{
+				return new WaitSettleState(this.content);
+			}
+			return this;
+		}
+	}
+
+	public static class WaitSettleState extends Room.State<PokerBullRoom>
+	{
+		public WaitSettleState(PokerBullRoom content)
+		{
+			super(content, WAIT_SETTLE_TIME_MILLISECOND);
+		}
+
+		@Override
+		protected void onEnter(FiniteStateMachine.Event e, FiniteStateMachine.State lastState)
+		{
+			// 进入比较状态
+			// 发最后一张牌
+			this.content.dealFinally();
+		}
+
+		@Override
+		protected void onExit(FiniteStateMachine.Event e, FiniteStateMachine.State nextState)
+		{
+			// 进入比较状态
+			// 比较输赢
+			this.content.prize();
+		}
+
+		@Override
+		protected FiniteStateMachine.State doTick(float deltaTime)
+		{
+			if(isTimeOut())
+			{
+				// 下一局
+				return new WaitState(this.content);
+			}
+			return this;
+		}
+	}
+
+	/*public static class PrizeState extends Room.State<PokerBullRoom>
+	{
+		public PrizeState(PokerBullRoom content)
+		{
+			super(content, 1000L);
+		}
+
+		@Override
+		protected void onEnter(FiniteStateMachine.Event e, FiniteStateMachine.State lastState)
+		{
+			// 进入结算状态
+			// 发奖后面只是等播动画
+			this.content.prize();
+		}
+
+		@Override
+		protected void onExit(FiniteStateMachine.Event e, FiniteStateMachine.State nextState)
+		{
+			super.onExit(e, nextState);
+		}
+
+		@Override
+		protected FiniteStateMachine.State doTick(float deltaTime)
+		{
+			if(isTimeOut())
+			{
+				// 下一局
+				return new WaitState(content);
+			}
+			return this;
+		}
+	}*/
+
+
+
+	/*enum State implements Room.State
 	{
 		WAIT(0, 10),
 		//SHUFFLE(0, 10),
@@ -198,25 +451,44 @@ public class PokerBullRoom extends Room
 			this.key = key;
 			this.cooldown = cooldown;
 		}
-	}
+	}*/
 
-	public PokerBullRoom()
+	public PokerBullRoom(long uuid, Ticker ticker, Regulation regulation)
 	{
-		super(111111L, null);
+		super(uuid, ticker, regulation);
 	}
 
 	public void shuffle()
 	{
+		System.out.println(this.getClass().toString() + "::" + getMethodName() + " user =" + this.playingPlayers.keySet());
+
+		// 等待的人开始玩耍
+		this.playingPlayers.putAll(this.waitingPlayers);
+		this.waitingPlayers.clear();
+
 		this.remaining.addAll(this.used);
 		Collections.shuffle(this.remaining);
 		this.used.clear();
+
+		// debug
+		String debug = "牌库 ";
+		for(int i = 0; i < this.remaining.size(); ++i)
+		{
+			int v = this.remaining.get(i);
+			if(i % 10 == 0)
+				debug += "\n";
+			debug += " " + Constant.PokerCardSuit.parse(Constant.PokerCardType.parseSuit(v)) + Constant.PokerCardType.parseInteger(v);
+		}
+		System.out.println(debug);
 	}
 
 	public void dealOrderly()
 	{
+		System.out.println(this.getClass().toString() + "::" + getMethodName() + " user =" + this.playingPlayers.keySet());
+
 		for(int i = 0; i < PREVIOUS_CARD_NUMBER; ++i)
 		{
-			for(String id : this.players.keySet())
+			for(String id : this.playingPlayers.keySet())
 			{
 				if(!this.currentCards.containsKey(id))
 					this.currentCards.put(id, new ArrayList<>());
@@ -228,8 +500,23 @@ public class PokerBullRoom extends Room
 				this.used.add(obj);
 			}
 		}
+
+		// debug
+		for(Map.Entry<String, List<Integer>> entry : this.currentCards.entrySet())
+		{
+			String debug = "player =" + entry.getKey();
+
+			for(int i : entry.getValue())
+			{
+				debug += " " + Constant.PokerCardSuit.parse(Constant.PokerCardType.parseSuit(i)) + Constant.PokerCardType.parseInteger(i);
+			}
+
+			System.out.println(debug);
+		}
+
 		// default odds values
-		for(User o : this.players.values())
+		// 这个可以不写
+		for(String o : this.playingPlayers.keySet())
 		{
 			setBettingOdds(o, this.regulation.defaultBettingOdds());
 			//setCallingOdds(o, this.regulation.defaultCallingOdds());
@@ -243,7 +530,9 @@ public class PokerBullRoom extends Room
 
 	public void dealFinally()
 	{
-		for(String id : players.keySet())
+		System.out.println(this.getClass().toString() + "::" + getMethodName() + " user =" + this.playingPlayers.keySet());
+
+		for(String id : playingPlayers.keySet())
 		{
 			if(!this.currentCards.containsKey(id))
 				this.currentCards.put(id, new ArrayList<>());
@@ -254,10 +543,31 @@ public class PokerBullRoom extends Room
 			list.add(obj);
 			this.used.add(obj);
 		}
+
+		// debug
+		Set<Integer> sets = new HashSet<>();
+		for(Map.Entry<String, List<Integer>> entry : this.currentCards.entrySet())
+		{
+			String debug = "player =" + entry.getKey();
+
+			for(int i : entry.getValue())
+			{
+				debug += " " + Constant.PokerCardSuit.parse(Constant.PokerCardType.parseSuit(i)) + Constant.PokerCardType.parseInteger(i);
+
+				// duplicate
+				if(sets.add(i))
+					throw new DuplicateFormatFlagsException("source =" + sets + " duplicate id =" + i);
+			}
+
+			System.out.println(debug);
+		}
+
 	}
 
 	public void call()
 	{
+		System.out.println(this.getClass().toString() + "::" + getMethodName() + " user =" + this.playingPlayers.keySet());
+
 		int previous = -1;
 		List<String> list = null;
 		for(Map.Entry<Integer, List<String>> entry : this.callingOdds.entrySet())
@@ -272,7 +582,7 @@ public class PokerBullRoom extends Room
 		if(list == null || list.isEmpty())
 		{
 			list = new ArrayList<>();
-			list.addAll(this.players.keySet());
+			list.addAll(this.playingPlayers.keySet());
 		}
 
 		String key = list.get(Random.randomInt(100) % list.size());
@@ -281,13 +591,16 @@ public class PokerBullRoom extends Room
 			/// error
 		}
 
-		User player = this.players.get(key);
+		User player = this.playingPlayers.get(key);
 		if(player == null)
 		{
 			/// error
 		}
 
 		this.banker = key;
+
+		// debug
+		System.out.println("calling odds =" + this.callingOdds + " banker =" + this.banker);
 	}
 
 	/*public void callRandomly(List<User> players)
@@ -308,6 +621,8 @@ public class PokerBullRoom extends Room
 
 	public void prize()
 	{
+		System.out.println(this.getClass().toString() + "::" + getMethodName() + " user =" + this.playingPlayers.keySet());
+
 		BullResult result = BullResult.None;
 		Judgement judgement = this.previousJudgements.get(this.banker);
 		if(judgement != null)
@@ -320,34 +635,41 @@ public class PokerBullRoom extends Room
 			result = judgeResult(list);
 		}
 
+		// debug
+		System.out.println("banker " + this.banker + result);
+
+
 		// settlement
 		for(Map.Entry<String, List<Integer>> entry : this.currentCards.entrySet())
 		{
 			if(entry.getKey() != this.banker)
 			{
 				BullResult r = BullResult.None;
-				Judgement j = this.previousJudgements.get(this.banker);
+				Judgement j = this.previousJudgements.get(entry.getKey());
 				if(j != null)
 				{
 					r = judgeResult(j);
 				}
 				else
 				{
-					List<Integer> list = this.currentCards.get(this.banker);
+					List<Integer> list = this.currentCards.get(entry.getKey());
 					r = judgeResult(list);
 				}
 
-				int o = this.bettingOdds.get(entry.getKey());
+				int o = getBettingOdds(entry.getKey());//this.bettingOdds.get(entry.getKey());
 				int c = result.compareTo(r);
 
 				if(c > 0) // banker win
 				{
-					int v = regulation.prize(true, o, r.type.getKey());
+					//int v = regulation.prize(true, o, r.type.getKey());
 				}
 				else // banker lose
 				{
-					int v = regulation.prize(true, o, r.type.getKey());
+					//int v = regulation.prize(true, o, r.type.getKey());
 				}
+
+				// debug
+				System.out.println("banker " + result + (c > 0 ? " 赢了" : " 输给") + " player " + entry.getKey() + r );
 
 			}
 		}
@@ -442,11 +764,13 @@ public class PokerBullRoom extends Room
 			        int count = list.size();
 		            if ((other == i && count >= 2) || (other != i && count >= 1))
 		            {
-			            int one =  Collections.max(list);
-			            int two = Collections.max(map.get(i));
-			            System.out.println("--------------- major = " + Constant.PokerCardType.parseInteger(Math.max(one, two)) + ":" + Math.max(one, two)
-					            + " --------------- minor = " + Constant.PokerCardType.parseInteger(Math.min(one, two)) + ":" + Math.min(one, two));
-			            break;
+			            //int one =  Collections.max(list);
+			            //int two = Collections.max(map.get(i));
+			            //System.out.println("--------------- major = " + Constant.PokerCardType.parseType(Math.max(one, two)) + ":" + Math.max(one, two)
+					    //        + " --------------- minor = " + Constant.PokerCardType.parseType(Math.min(one, two)) + ":" + Math.min(one, two));
+
+			            return new BullResult(Constant.BullType.parse(point == 0 ? 10 : point), major, minor);
+			            //break;
 		            }
 		        }
 		    }
@@ -536,7 +860,7 @@ public class PokerBullRoom extends Room
 			List<Integer> list = map.get(0);
 			for(Integer i : list)
 			{
-				int value = Constant.PokerCardType.parseInteger(i);
+				int value = Constant.PokerCardType.parseType(i);
 				if(value <= 10)
 					return false;
 
@@ -565,13 +889,13 @@ public class PokerBullRoom extends Room
 		return new ArrayList<>();
 	}
 
-	@Override
+	/*@Override
 	public long elapse()
 	{
 		return 0;
-	}
+	}*/
 
-	@Override
+	/*@Override
 	public void tick()
 	{
 		this.countingDelta++;
@@ -611,24 +935,47 @@ public class PokerBullRoom extends Room
 			this.countingDelta = 0;
 		}
 
-	}
+	}*/
 
 	@Override
 	public int getMaxNumber()
 	{
-		return 0;
+		return this.MAX_PLAYER_NUMBER;
 	}
 
 	@Override
 	public boolean canPlay()
 	{
-		return getPlayingNumber() > 2;
+		return getParticipatingNumber() >= this.MIN_PLAYER_NUMBER;
 	}
 
-	@Override
+	/*@Override
 	public void clear()
 	{
 		super.clear();
+	}*/
+
+	@Override
+	public void start()
+	{
+		// 初始化牌
+		for(Constant.PokerCardSuit s : Constant.PokerCardSuit.values())
+		{
+			if(s == Constant.PokerCardSuit.ALL)
+				continue;
+
+			for(Constant.PokerCardType t : Constant.PokerCardType.values())
+			{
+				if(t == Constant.PokerCardType.CardInvalid)
+					continue;
+
+				this.remaining.add(Constant.PokerCardType.toPokerCard(t, s));
+			}
+		}
+
+
+		super.start();
+		this.fsm.reset();
 	}
 
 	@Override
@@ -643,15 +990,24 @@ public class PokerBullRoom extends Room
 
 	}
 
-	public boolean isPlay()
+	@Override
+	public void onTick(float delta)
 	{
-		return isPlay;
+		this.fsm.tick(delta);
 	}
 
 	// 开始游戏每人设置一遍
-	public void setBettingOdds(User player, int odds)
+	public void setBettingOdds(String key, int odds)
 	{
-		this.bettingOdds.put(player.getKey(), odds);
+		this.bettingOdds.put(key, odds);
+	}
+
+	protected int getBettingOdds(String key)
+	{
+		if(this.bettingOdds.containsKey(key))
+			return this.bettingOdds.get(key);
+
+		return 5;
 	}
 
 	/*public void setCallingOdds(User player, int odds)
@@ -702,8 +1058,8 @@ public class PokerBullRoom extends Room
 	            {
 		            int one =  Collections.max(list);
 		            int two = Collections.max(map.get(i));
-		            System.out.println("--------------- major = " + Constant.PokerCardType.parseInteger(Math.max(one, two)) + ":" + Math.max(one, two)
-				            + " --------------- minor = " + Constant.PokerCardType.parseInteger(Math.min(one, two)) + ":" + Math.min(one, two));
+		            System.out.println("--------------- major = " + Constant.PokerCardType.parseType(Math.max(one, two)) + ":" + Math.max(one, two)
+				            + " --------------- minor = " + Constant.PokerCardType.parseType(Math.min(one, two)) + ":" + Math.min(one, two));
 		            break;
 	            }
 	        }
@@ -714,7 +1070,7 @@ public class PokerBullRoom extends Room
 
 	public static void main(String[] args)
 	{
-		System.out.println("中文");
+		System.out.println("测试牛牌算法");
 
 		// test enum
 		for(int i = 0; i < 200; ++i)

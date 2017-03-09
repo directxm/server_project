@@ -2,6 +2,8 @@ package com.game.matcher;
 
 import com.game.room.Room;
 import com.x.network.io.Tickable;
+import com.x.network.io.Ticker;
+import com.x.network.service.ServiceSystem;
 import com.x.wechat.data.User;
 
 import java.util.HashMap;
@@ -14,7 +16,7 @@ import java.util.Map;
  * changing room is executed immediately by protocol.
  * matching room is executed on time.
  */
-public abstract class Matcher implements Tickable
+public abstract class Matcher implements Tickable, Ticker
 {
 	//protected Room roomType
 	// id
@@ -49,16 +51,6 @@ public abstract class Matcher implements Tickable
 			leave(player);
 	}
 
-	public void addTickable(Tickable t)
-	{
-
-	}
-
-	public Tickable removeTickable(Tickable t)
-	{
-		return null;
-	}
-
 	protected void match()
 	{
 		// 匹配房间
@@ -80,6 +72,10 @@ public abstract class Matcher implements Tickable
 				if(p != null && onMatch(p, this.previousRoom))
 				{
 					this.queuedPlayers.remove(0);
+				}
+				else
+				{
+					// 当前人未被匹配到,进入下一轮
 					break;
 				}
 			}
@@ -90,9 +86,9 @@ public abstract class Matcher implements Tickable
 			}
 		}
 
-		if(this.previousRoom.canPlay())
+		if(this.previousRoom.canPlay() && !this.previousRoom.isTick())
 		{
-			addTickable(this.previousRoom);
+			this.previousRoom.start();
 		}
 
 		if(this.previousRoom.isFull())
@@ -170,16 +166,14 @@ public abstract class Matcher implements Tickable
 	 *
 	 * @param player
 	 * @param room
-	 * @return true:停止匹配 false:继续匹配下个人
+	 * @return false:停止匹配 true:继续匹配下个人
 	 */
 	protected boolean onMatch(User player, Room room)
 	{
-		enter(player, room);
-
 		if(room.isFull())
-			return true;
+			return false;
 
-		return false;
+		return enter(player, room);
 	}
 
 	protected boolean enter(User player, Room room)
@@ -218,8 +212,7 @@ public abstract class Matcher implements Tickable
 				if(room.isEmpty())
 				{
 					this.recyclableRooms.add(room);
-					removeTickable(room);
-					room.clear();
+					room.stop();
 				}
 				else
 				{
@@ -229,6 +222,24 @@ public abstract class Matcher implements Tickable
 				this.fullRooms.remove(room.getUuid());
 			}
 		}
+	}
+
+	@Override
+	public void addTickable(Tickable t)
+	{
+		ServiceSystem.getInstance().addTickable(t);
+	}
+
+	@Override
+	public Tickable removeTickable(Tickable t)
+	{
+		return ServiceSystem.getInstance().removeTickable(t);
+	}
+
+	@Override
+	public long elapse()
+	{
+		return 1000L;
 	}
 
 	@Override
