@@ -35,6 +35,8 @@ public abstract class Matcher implements Tickable, Ticker
 	// previous room
 	protected Room previousRoom = null;
 
+	protected long countingDelta = 0L;
+
 	public void add(User player)
 	{
 		//this.queuedPlayers.put(player.getKey(), player);
@@ -102,7 +104,7 @@ public abstract class Matcher implements Tickable, Ticker
 	protected Room matchRoom()
 	{
 		Room room = null;
-		if(this.emergentRooms.size() <= 0)
+		if(this.emergentRooms.isEmpty())
 		{
 			if(!this.recyclableRooms.isEmpty())
 			{
@@ -209,17 +211,22 @@ public abstract class Matcher implements Tickable, Ticker
 				room.leave(player);
 				this.playerInRooms.remove(player.getKey());
 
+				if(this.fullRooms.containsKey(room.getUuid()))
+					this.fullRooms.remove(room.getUuid());
+
 				if(room.isEmpty())
 				{
 					this.recyclableRooms.add(room);
 					room.stop();
+					if(this.emergentRooms.contains(room))
+					{
+						this.emergentRooms.remove(room);
+					}
 				}
-				else
+				else if(!this.emergentRooms.contains(room))
 				{
 					this.emergentRooms.add(room);
 				}
-
-				this.fullRooms.remove(room.getUuid());
 			}
 		}
 	}
@@ -245,6 +252,10 @@ public abstract class Matcher implements Tickable, Ticker
 	@Override
 	public void tick()
 	{
+		long time = System.currentTimeMillis();
+		float delta = time - this.countingDelta;
+		this.countingDelta = time;
+
 		match();
 		/*if(!this.queuedPlayers.isEmpty())
 		{
@@ -253,6 +264,12 @@ public abstract class Matcher implements Tickable, Ticker
 			if(key != null && this.players.containsKey(key))
 				match(this.players.get(key));
 		}*/
+
+		System.out.println("match tick time " + delta);
+		System.out.println("current room count " + this.rooms.size());
+		System.out.println("full room count " + this.fullRooms.size());
+		System.out.println("emergent room count " + this.emergentRooms.size());
+		System.out.println("recyclable room count " + this.recyclableRooms.size());
 	}
 
 	public abstract Room allocate();

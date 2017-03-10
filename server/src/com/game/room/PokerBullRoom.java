@@ -247,7 +247,6 @@ public class PokerBullRoom extends Room
 		protected void onExit(FiniteStateMachine.Event e, FiniteStateMachine.State nextState)
 		{
 			// 退出等待状态
-			this.content.play(true);
 			//this.content.dealOrderly();
 		}
 
@@ -479,11 +478,14 @@ public class PokerBullRoom extends Room
 				debug += "\n";
 			debug += " " + Constant.PokerCardSuit.parse(Constant.PokerCardType.parseSuit(v)) + Constant.PokerCardType.parseInteger(v);
 		}
-		System.out.println(debug);
+		//System.out.println(debug);
 	}
 
 	public void dealOrderly()
 	{
+		// 发牌开始
+		this.play(true);
+
 		System.out.println(this.getClass().toString() + "::" + getMethodName() + " user =" + this.playingPlayers.keySet());
 
 		for(int i = 0; i < PREVIOUS_CARD_NUMBER; ++i)
@@ -519,7 +521,6 @@ public class PokerBullRoom extends Room
 		for(String o : this.playingPlayers.keySet())
 		{
 			setBettingOdds(o, this.regulation.defaultBettingOdds());
-			//setCallingOdds(o, this.regulation.defaultCallingOdds());
 		}
 	}
 
@@ -673,6 +674,9 @@ public class PokerBullRoom extends Room
 
 			}
 		}
+
+		// 结算开始
+		this.play(false);
 	}
 
 	public void over()
@@ -774,6 +778,9 @@ public class PokerBullRoom extends Room
 		            }
 		        }
 		    }
+
+			result.major = major;
+			result.minor = minor;
 
 			/*int major = Constant.PokerCardType.CardInvalid.getKey();
 			int minor = Constant.PokerCardType.CardInvalid.getKey();
@@ -987,7 +994,11 @@ public class PokerBullRoom extends Room
 	@Override
 	public void onLeave(User player)
 	{
-
+		// 这里好像什么都不用做
+		/*if(canPlay())
+		{
+			fsm.reset();
+		}*/
 	}
 
 	@Override

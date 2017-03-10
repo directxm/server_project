@@ -68,7 +68,7 @@ public abstract class FiniteStateMachine<T>
 
         public final void reset()
         {
-            System.out.println(this.getClass().toString() + "::" + getMethodName() + " timer =" + this.timer);
+            //System.out.println(this.getClass().toString() + "::" + getMethodName() + " timer =" + this.timer);
 
             onReset();
             resetTimer();
@@ -76,14 +76,14 @@ public abstract class FiniteStateMachine<T>
 
         public final State input(Event e)
         {
-            System.out.println(this.getClass().toString() + "::" + getMethodName() + " timer =" + this.timer);
+            //System.out.println(this.getClass().toString() + "::" + getMethodName() + " timer =" + this.timer);
 
             return doEvent(e);
         }
 
         public final State tick(float delta)
         {
-            System.out.println(this.getClass().toString() + "::" + getMethodName() + " timer =" + this.timer);
+            //System.out.println(this.getClass().toString() + "::" + getMethodName() + " timer =" + this.timer);
 
             this.timer.increase(delta);
             return doTick(delta);
@@ -91,7 +91,7 @@ public abstract class FiniteStateMachine<T>
 
         public final void enter(Event e, State lastState)
         {
-            System.out.println(this.getClass().toString() + "::" + getMethodName() + " timer =" + this.timer);
+            //System.out.println(this.getClass().toString() + "::" + getMethodName() + " timer =" + this.timer);
 
             reset();
             onEnter(e, lastState);
@@ -99,14 +99,14 @@ public abstract class FiniteStateMachine<T>
 
         public final void exit(Event e, State nextState)
         {
-            System.out.println(this.getClass().toString() + "::" + getMethodName() + " timer =" + this.timer);
+            //System.out.println(this.getClass().toString() + "::" + getMethodName() + " timer =" + this.timer);
 
             onExit(e, nextState);
         }
 
         public final void handle(Object object)
         {
-            System.out.println(this.getClass().toString() + "::" + getMethodName() + " timer =" + this.timer);
+            //System.out.println(this.getClass().toString() + "::" + getMethodName() + " timer =" + this.timer);
 
             onHandle(object);
         }

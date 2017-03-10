@@ -53,7 +53,7 @@ public class TestMatcher extends Matcher
 	@Override
 	public long elapse()
 	{
-		return 1000L;
+		return 100L;
 	}
 
 	@Override
@@ -97,7 +97,7 @@ public class TestMatcher extends Matcher
 
 			// 6名玩家
 			List<User> users = new ArrayList<>();
-			for(int i = 0; i < 10000; ++i)
+			for(int i = 0; i < 4; ++i)
 			{
 				users.add(User.test("test" + i));
 			}
@@ -118,7 +118,7 @@ public class TestMatcher extends Matcher
 					in = false;
 				}
 
-				Thread.sleep(900000L);
+				Thread.sleep(9000L);
 
 				if(!in)
 				{
@@ -130,6 +130,8 @@ public class TestMatcher extends Matcher
 
 					in = true;
 				}
+
+				Thread.sleep(9000L);
 			}
 
 			// 一定时间离开一人，直到全部离开

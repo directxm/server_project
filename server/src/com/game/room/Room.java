@@ -6,15 +6,15 @@ import com.x.network.io.Tickable;
 import com.x.network.io.Ticker;
 import com.x.wechat.data.User;
 
+import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 
 /**
  * Created by fatum on 2017/2/14.
  */
-public abstract class Room implements Tickable
+public abstract class Room implements Tickable, Serializable
 {
-
 	/*public static class RoomFiniteStateMachine<T extends Room> extends FiniteStateMachine<T>
 	{
 		public RoomFiniteStateMachine(T content)
@@ -156,7 +156,7 @@ public abstract class Room implements Tickable
 		this.playingPlayers.clear();
 		this.waitingPlayers.clear();
 
-		this.play = false;
+		play(false);
 		this.countingDelta = 0L;
 
 		this.tick = false;
@@ -172,7 +172,9 @@ public abstract class Room implements Tickable
 		this.tick = true;
 		ticker.addTickable(this);
 
-		System.out.println("room id =" + uuid + " start!");
+		this.countingDelta = System.currentTimeMillis();
+
+		System.out.println("room id =" + uuid + " start time =" + this.countingDelta);
 	}
 
 	public void start(User player)
@@ -223,9 +225,31 @@ public abstract class Room implements Tickable
 	@Override
 	public void tick()
 	{
-		float delta = 1000L;
+		long time = System.currentTimeMillis();
+		float delta = time - this.countingDelta;
+		this.countingDelta = time;
 		//fsm.tick(delta);
 		onTick(delta);
+
+		System.out.println("room id =" + uuid + " tick time =" + delta);
+	}
+
+	@Override
+	public boolean equals(Object o)
+	{
+		if(this == o) return true;
+		if(o == null || getClass() != o.getClass()) return false;
+
+		Room room = (Room)o;
+
+		return uuid == room.uuid;
+
+	}
+
+	@Override
+	public int hashCode()
+	{
+		return (int)(uuid ^ (uuid >>> 32));
 	}
 
 	// µ˜ ‘”√
